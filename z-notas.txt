@@ -1,0 +1,77 @@
+php artisan make:model Customer -m
+php artisan make:model Order -m
+php artisan make:model OrderItem -m
+php artisan make:model Product -m
+php artisan make:model ProductCategory -m
+php artisan make:model ProductVariant -m
+php artisan make:model ProductExtra -m
+php artisan make:model ProductSide -m
+
+
+
+customers
+products
+product_categories
+tables
+employees
+orders
+order_items
+order_sources
+invoices
+invoice_items
+receipts
+payment_methods
+suppliers
+inventory
+inventory_movements
+shifts
+cash_registers
+taxes
+discounts
+restaurant_settings
+web_orders
+delivery_addresses
+online_customers
+order_statuses
+
+
+
+
+
+
+
+
+
+
+// Filete de pollo con contornos
+order_items:
+- product_name: "Filete de pollo a la plancha"
+- unit_price: 18.00
+- selected_sides: [
+    {"id": 1, "name": "Arroz blanco", "price": 0.00, "is_included": true},
+    {"id": 3, "name": "Ensalada mixta", "price": 0.00, "is_included": true}
+  ]
+- selected_extras: []  // Vacío para platos compuestos
+- sides_total: 0.00
+- total_price: 18.00
+
+// Pizza con adicionales
+order_items:
+- product_name: "Pizza Margarita"
+- variant_name: "Grande"
+- unit_price: 20.00
+- selected_extras: [
+    {"id": 1, "name": "Queso extra", "price": 2.50},
+    {"id": 2, "name": "Pepperoni", "price": 4.00}
+  ]
+- selected_sides: []   // Vacío para pizzas
+- extras_total: 6.50
+- total_price: 26.50
+
+
+
+
+if (session()->has('login_web_' . sha1(config('app.key')))) {
+        return redirect('/dashboard');
+    }
+    return redirect('/login');
