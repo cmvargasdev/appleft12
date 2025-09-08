@@ -45,9 +45,13 @@ new class extends Component {
                 @forelse($categories as $category)
                     <li class="px-6 py-2">
                         <div class="flex items-center justify-between">
-                            <p class="text-sm font-medium ">
-                                {{ $category->name }}
-                            </p>
+                             <flux:link
+                                    class="text-sm font-medium"
+                                    variant="ghost"
+                                    href="{{route('product-categories.edit',$category->id)}}"
+                                >
+                                    {{ $category->name }}
+                                </flux:link>
                             <div class="">
                                 <button wire:click="moveUp({{ $category->id }})">⬆️</button>
                                 <button wire:click="moveDown({{ $category->id }})">⬇️</button>
