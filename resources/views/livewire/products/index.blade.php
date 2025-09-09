@@ -187,16 +187,16 @@ $updated = function ($property) {
                     <li class="px-6 py-2">
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
-                                <flux:link
+                                <flux:link wire:click="openEditModal({{ $product->id }})"
                                     class="text-sm font-medium"
                                     variant="ghost"
                                 >
                                     {{ $product->name }}
                                 </flux:link>
                                 @if($product->category)
-                                    <div class="text-xs text-gray-500 mt-1">
+                                    <span class="text-xs text-gray-500 mt-1">
                                         {{ $product->category->name }}
-                                    </div>
+                                    </span>
                                 @endif
                                 <div class="text-xs text-gray-500 mt-1">
                                     @if($product->has_variants) <b>Var:</b>
