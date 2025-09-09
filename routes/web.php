@@ -54,13 +54,8 @@ Route::get('menu', function () {
     $categories = ProductCategory::select('id', 'name','pos')
         ->orderBy('pos')
         ->get();
-     $products = Product::select('id', 'name','pos','product_category_id')
+     $products = Product::select('id', 'name','pos','product_category_id','has_variants')
             ->orderBy('pos')
             ->get();
-
-        foreach( $categories as $cat){
-            foreach( $products->where('product_category_id',$cat->id) as $prod){
-                echo "<br> c:$prod->product_category_id - pos:$prod->pos / $prod->name";
-            }
-        }
+    return view('menu',compact('categories','products'));
 })->name('menu');
