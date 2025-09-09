@@ -13,7 +13,7 @@ state([
 ]);
 
 with(fn () => [
-    'products' => Product::select('id', 'name', 'pos', 'product_category_id')
+    'products' => Product::select('id', 'name', 'pos', 'product_category_id','has_variants')
         ->with('category:id,name') // Eager loading de la categoría
         ->when($this->search, function ($query) {
             $query->where('name', 'like', '%' . $this->search . '%');
@@ -198,6 +198,15 @@ $updated = function ($property) {
                                         {{ $product->category->name }}
                                     </div>
                                 @endif
+                                <div class="text-xs text-gray-500 mt-1">
+                                    @if($product->has_variants) <b>Var:</b>
+                                        @foreach ($product->variants as $variant)
+                                            {{ $variant->name }}:{{ $variant->price }} /
+                                        @endforeach
+                                    @else
+                                        <b>Uni:</b> {{$product->price}}
+                                    @endif
+                                </div>
                             </div>
 
                             <div class="flex gap-2 items-center">

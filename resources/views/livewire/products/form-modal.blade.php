@@ -103,7 +103,7 @@ $save = function () {
         $this->validate();
 
         $data = $this->only(['name', 'descrip', 'price', 'product_category_id','has_variants']);
-
+        info($data);
         if ($this->image) {
             $filename = time() . '_' . $this->image->getClientOriginalName();
             $path = $this->image->storeAs('products', $filename, 'public');
