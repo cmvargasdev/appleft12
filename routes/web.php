@@ -59,3 +59,21 @@ Route::get('menu', function () {
             ->get();
     return view('menu',compact('categories','products'));
 })->name('menu');
+
+Route::get('api/products', function () {
+        $products = Product::select('id', 'name', 'pos', 'descrip', 'detail','product_category_id', 'has_variants')
+                ->with('variants')
+                ->orderBy('pos')
+                ->get();
+        return response()->json($products);
+});
+
+Route::get('api/categories', function () {
+        $categories = ProductCategory::select('id', 'name','pos','image')
+                ->orderBy('pos')
+                ->get();
+        return response()->json($categories);
+});
+
+
+
