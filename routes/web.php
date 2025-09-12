@@ -61,7 +61,7 @@ Route::get('menu', function () {
 })->name('menu');
 
 Route::get('api/products', function () {
-        $products = Product::select('id', 'name', 'pos', 'descrip', 'detail','product_category_id', 'has_variants')
+        $products = Product::select('id', 'name', 'pos', 'descrip', 'detail','product_category_id', 'has_variants','price')
                 ->with('variants')
                 ->orderBy('pos')
                 ->get();
