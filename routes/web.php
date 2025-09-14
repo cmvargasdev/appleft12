@@ -51,12 +51,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 require __DIR__.'/auth.php';
 Route::get('menu', function () {
 
-    $categories = ProductCategory::select('id', 'name','pos')
-        ->orderBy('pos')
-        ->get();
-     $products = Product::select('id', 'name','pos','product_category_id','has_variants')
-            ->orderBy('pos')
-            ->get();
+    $categories = ProductCategory::orderBy('pos')->get();
+     $products = Product::orderBy('pos')->get();
     return view('menu',compact('categories','products'));
 })->name('menu');
 
