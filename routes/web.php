@@ -13,10 +13,10 @@ Route::middleware('throttle:30,1')->get('/', function () {
 
 
 Route::middleware(['auth'])->group(function () {
-    Volt::mount(['waiter' => resource_path('views/livewire/waiter')]);
+    //Volt::mount(['waiter' => resource_path('views/livewire/waiter')]);
 
 
-    Volt::route('/dashboard', 'tables')->name('dashboard');
+    Volt::route('/dashboard', 'waiter/tables')->name('dashboard');
     #Volt::route('tables/{table}', 'tables.show')->name('tables.show');
     Volt::route('products', 'products')->name('products.list');
 
