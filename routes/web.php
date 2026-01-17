@@ -13,27 +13,27 @@ Route::middleware('throttle:30,1')->get('/', function () {
 
 
 Route::middleware(['auth'])->group(function () {
-    Volt::mount(['waiter' => resource_path('views/livewire/waiter')]);
+    //Volt::mount(['waiter' => resource_path('views/livewire/waiter')]);
 
 
-    Volt::route('/dashboard', 'tables')->name('dashboard');
+    Volt::route('/dashboard', 'waiter/tables')->name('dashboard');
     #Volt::route('tables/{table}', 'tables.show')->name('tables.show');
-    Volt::route('products', 'products')->name('products.list');
+    Volt::route('products', 'waiter/products')->name('products.list');
 
     #Volt::route('tables', 'tables.index')->name('tables.index');
 
 
 
-    Volt::route('orders', 'orders')->name('orders.list');
+    Volt::route('orders', 'waiter/orders')->name('orders.list');
     #Volt::route('orders/{order}', 'orders.show')->name('orders.show');
 
 });
 
 Route::middleware(['auth'])->prefix('admin')->group(function () {
 
-    Volt::mount(['admin' => resource_path('views/livewire/admin')]);
+    //Volt::mount(['admin' => resource_path('views/livewire/admin')]);
 
-    Route::view('dashboard', 'dashboard')->name('admin.dashboard');
+    Route::view('dashboard', 'admin/dashboard')->name('admin.dashboard');
     Route::redirect('/', 'admin/dashboard');
 
     Route::prefix('products')
