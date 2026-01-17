@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\ProductController;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use Illuminate\Support\Facades\Route;
@@ -13,8 +12,28 @@ Route::middleware('throttle:30,1')->get('/', function () {
 })->name('home');
 
 
+Route::middleware(['auth'])->group(function () {
+    Volt::mount(['waiter' => resource_path('views/livewire/waiter')]);
+
+
+    Volt::route('/dashboard', 'tables')->name('dashboard');
+    #Volt::route('tables/{table}', 'tables.show')->name('tables.show');
+    Volt::route('products', 'products')->name('products.list');
+
+    #Volt::route('tables', 'tables.index')->name('tables.index');
+
+
+
+    Volt::route('orders', 'orders')->name('orders.list');
+    #Volt::route('orders/{order}', 'orders.show')->name('orders.show');
+
+});
+
 Route::middleware(['auth'])->prefix('admin')->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+
+    Volt::mount(['admin' => resource_path('views/livewire/admin')]);
+
+    Route::view('dashboard', 'dashboard')->name('admin.dashboard');
     Route::redirect('/', 'admin/dashboard');
 
     Route::prefix('products')
@@ -55,21 +74,3 @@ Route::get('menu', function () {
      $products = Product::orderBy('pos')->get();
     return view('menu',compact('categories','products'));
 })->name('menu');
-
-Route::get('api/products', function () {
-        $products = Product::select('id', 'name', 'pos', 'descrip', 'detail','product_category_id', 'has_variants','price')
-                ->with('variants')
-                ->orderBy('pos')
-                ->get();
-        return response()->json($products);
-});
-
-Route::get('api/categories', function () {
-        $categories = ProductCategory::select('id', 'name','pos','image')
-                ->orderBy('pos')
-                ->get();
-        return response()->json($categories);
-});
-
-
-

@@ -15,7 +15,9 @@ class Product extends Model
         'descrip',
         'detail',  //Slices/Porc Mini:4 Med:6 Fam:8 Extra:12
         'price',
+        'pricebs',
         'product_category_id',
+        'is_menu_digital',
         'has_variants',
         'status',
         'image'
@@ -33,5 +35,12 @@ class Product extends Model
 
     public function availableExtras() {
         return $this->belongsToMany(ProductExtra::class, 'product_extra_availability')->withPivot('price');
+    }
+
+    public function scopeMenuDigital($query)
+    {
+        return $query->whereHas('category', function ($categoryQuery) {
+            $categoryQuery->where('is_menu_digital', true);
+        })->where('is_menu_digital', true);
     }
 }

@@ -102,6 +102,10 @@ $save = function () {
     try {
         $this->validate();
 
+        if ($this->has_variants) {
+            $this->price = 0;
+        }
+
         $data = $this->only(['name', 'descrip', 'price', 'product_category_id','has_variants']);
 
         if ($this->image) {
@@ -172,7 +176,6 @@ $saveVariants = function ($product) {
 };
 
 $showVariants = computed(function () {
-    $this->price = 0;
     return $this->has_variants == 1;
 });
 

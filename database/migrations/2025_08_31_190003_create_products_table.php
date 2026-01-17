@@ -18,7 +18,9 @@ return new class extends Migration
             $table->text('descrip')->nullable();
             $table->text('detail')->nullable(); // Ej: Slices/Porc Mini:4 Med:6 Fam:8 Extra:12
             $table->decimal('price', 10, 2)->default(0);
+            $table->decimal('pricebs', 10, 2)->default(0);
             $table->unsignedBigInteger('product_category_id')->nullable();
+            $table->boolean('is_menu_digital')->default(false);
             $table->boolean('has_variants')->default(false);
             $table->boolean('status')->default(true);
             $table->string('image')->nullable();

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->integer('pos')->nullable();
             $table->string('name');
+            $table->boolean('is_menu_digital')->default(false);
             $table->string('image')->nullable();
             $table->timestamps();
         });

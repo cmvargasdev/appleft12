@@ -52,55 +52,55 @@ $deleteProduct = function ($productId) {
     <!-- Mensaje de éxito -->
     @if($successMessage)
         <div class="mb-6">
-            <flux:alert variant="success" class="flex items-center justify-between">
-                <flux:alert.text>{{ $successMessage }}</flux:alert.text>
+            <div variant="success" class="flex items-center justify-between">
+                <div >{{ $successMessage }}</div>
                 <flux:button wire:click="$set('successMessage', '')" variant="ghost" size="sm" icon="x" />
-            </flux:alert>
+            </div>
         </div>
     @endif
 
     <!-- Tabla de productos con Flux -->
-    <flux:table>
-        <flux:columns>
-            <flux:column>Producto</flux:column>
-            <flux:column>Categoría</flux:column>
-            <flux:column>Precio</flux:column>
-            <flux:column>Variantes</flux:column>
-            <flux:column>Acciones</flux:column>
-        </flux:columns>
+    <table>
+        <tr>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>Variantes</th>
+            <th>Acciones</th>
+        </tr>
 
-        <flux:rows>
+        <tbody>
             @forelse($products as $product)
-                <flux:row wire:key="product-{{ $product->id }}">
+                <tr wire:key="product-{{ $product->id }}">
 
                     <!-- Columna Producto -->
-                    <flux:cell class="font-medium">
+                    <td class="font-medium">
                         <div>
                             <div class="font-semibold text-gray-900">{{ $product->name }}</div>
                             @if($product->descrip)
                                 <div class="text-sm text-gray-500 mt-1">{{ $product->descrip }}</div>
                             @endif
                         </div>
-                    </flux:cell>
+                    </td>
 
                     <!-- Columna Categoría -->
-                    <flux:cell>
+                    <td>
                         <flux:badge size="sm" color="zinc">
                             {{ $product->category->name ?? 'Sin categoría' }}
                         </flux:badge>
-                    </flux:cell>
+                    </td>
 
                     <!-- Columna Precio -->
-                    <flux:cell>
+                    <td>
                         @if($product->has_variants)
                             <flux:text class="text-gray-500 italic">Ver variantes</flux:text>
                         @else
                             <flux:text class="font-semibold">${{ number_format($product->price, 2) }}</flux:text>
                         @endif
-                    </flux:cell>
+                    </td>
 
                     <!-- Columna Variantes -->
-                    <flux:cell>
+                    <td>
                         @if($product->has_variants && $product->variants->count() > 0)
                             <div class="space-y-1">
                                 @foreach($product->variants->take(3) as $variant)
@@ -118,10 +118,10 @@ $deleteProduct = function ($productId) {
                         @else
                             <flux:text class="text-gray-400 text-sm">Sin variantes</flux:text>
                         @endif
-                    </flux:cell>
+                    </td>
 
                     <!-- Columna Acciones -->
-                    <flux:cell>
+                    <td>
                         <div class="flex items-center gap-2">
                             <flux:button
                                 wire:click="openEditModal({{ $product->id }})"
@@ -142,12 +142,12 @@ $deleteProduct = function ($productId) {
                                 Eliminar
                             </flux:button>
                         </div>
-                    </flux:cell>
+                    </td>
 
-                </flux:row>
+                </tr>
             @empty
-                <flux:row>
-                    <flux:cell colspan="5">
+                <tr>
+                    <td colspan="5">
                         <div class="text-center py-12">
                             <div class="mx-auto w-24 h-24 mb-4 text-gray-300">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-full h-full">
@@ -165,11 +165,11 @@ $deleteProduct = function ($productId) {
                                 Crear primer producto
                             </flux:button>
                         </div>
-                    </flux:cell>
-                </flux:row>
+                    </td>
+                </tr>
             @endforelse
-        </flux:rows>
-    </flux:table>
+        </tbody>
+    </table>
 
     <!-- Incluir el componente modal -->
     <livewire:products.modal />

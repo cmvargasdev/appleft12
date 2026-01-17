@@ -13,7 +13,7 @@ state([
 ]);
 
 with(fn () => [
-    'products' => Product::select('id', 'name', 'pos', 'product_category_id','has_variants')
+    'products' => Product::select('id', 'name', 'price','pos', 'product_category_id','has_variants')
         ->with('category:id,name') // Eager loading de la categoría
         ->when($this->search, function ($query) {
             $query->where('name', 'like', '%' . $this->search . '%');
@@ -179,7 +179,6 @@ $updated = function ($property) {
                 @endif
             </div>
         @endif
-<flux:modal.trigger name="product-modal">    <flux:button>Edit profile</flux:button></flux:modal.trigger>
 
         <div class="shadow overflow-hidden sm:rounded-md">
             <ul role="list" class="divide-y divide-gray-200">
@@ -204,7 +203,7 @@ $updated = function ($property) {
                                             {{ $variant->name }}:{{ $variant->price }} /
                                         @endforeach
                                     @else
-                                        <b>Uni:</b> {{$product->price}}
+                                        <b>Uni:</b>{{$product->price}}
                                     @endif
                                 </div>
                             </div>

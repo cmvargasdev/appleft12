@@ -13,6 +13,16 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->string('order_number')->unique();
+            $table->enum('status', ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'])->default('pending');
+            $table->enum('type', ['dine_in', 'takeaway', 'delivery'])->default('dine_in');
+            $table->decimal('subtotal', 10, 2)->default(0);
+            $table->decimal('tax', 10, 2)->default(0);
+            $table->decimal('total', 10, 2)->default(0);
+            $table->integer('customer_id')->nullable();
+            $table->integer('table_id')->nullable();
+            $table->integer('user_id')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
