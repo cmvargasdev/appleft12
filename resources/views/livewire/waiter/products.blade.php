@@ -376,30 +376,34 @@ document.addEventListener('alpine:init', () => {
 
 function productStore() {
     return {
-        // Método simplificado para abrir el modal
         openProductModal(productId) {
             Alpine.store('productStore').openProductModal(productId);
         },
 
-        // Getters para el pedido
+        // Getters seguros para el pedido
         get orderItems() {
-            return Alpine.store('order').items;
+            const orderStore = Alpine.store('order');
+            return orderStore ? orderStore.items : [];
         },
 
         get orderCount() {
-            return Alpine.store('order').getItemCount();
+            const orderStore = Alpine.store('order');
+            return orderStore ? orderStore.getItemCount() : 0;
         },
 
         removeItem(index) {
-            Alpine.store('order').removeItem(index);
+            const orderStore = Alpine.store('order');
+            if (orderStore) orderStore.removeItem(index);
         },
 
         clearOrder() {
-            Alpine.store('order').clearOrder();
+            const orderStore = Alpine.store('order');
+            if (orderStore) orderStore.clearOrder();
         },
 
         calculateTotal() {
-            return Alpine.store('order').calculateTotal();
+            const orderStore = Alpine.store('order');
+            return orderStore ? orderStore.calculateTotal() : 0;
         }
     };
 }
@@ -420,11 +424,8 @@ function productModal() {
         },
 
         init() {
-            console.log('productModal inicializado');
-
             // Resetear cuando se cierra el modal
             this.$watch('$flux.modal("product-details").open', (isOpen) => {
-                console.log('Modal open state:', isOpen);
                 if (!isOpen) {
                     this.resetModal();
                 }
