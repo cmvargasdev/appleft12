@@ -1,345 +1,465 @@
 <?php
-use function Livewire\Volt\{state, computed, on};
+use function Livewire\Volt\{state};
 use App\Models\Product;
 use App\Models\ProductCategory;
-use Illuminate\Support\Facades\Storage;
 
 state([
-    'selectedCategory' => null,
-    'selectedProduct' => null,
-    'showProductModal' => false,
-    'loadingProduct' => false, // Nuevo estado para loading
-]);
-
-$categories = computed(function () {
-    return ProductCategory::select('id', 'name', 'image')
+    'categories' => ProductCategory::select('id', 'name', 'image')
         ->whereHas('products', function ($query) {
             $query->where('status', 1);
         })
         ->orderBy('pos')
-        ->get();
-});
+        ->get()->toArray(),
 
-$products = computed(function () {
-    if (!$this->selectedCategory) {
-        return collect();
-    }
-
-    return Product::select('id', 'name', 'price', 'descrip', 'detail', 'image', 'has_variants')
-        ->with(['variants' => function($query) {
-            $query->select('id', 'product_id', 'name', 'price');
-        }])
-        ->where('product_category_id', $this->selectedCategory)
-        ->where('status', 1)
-        ->orderBy('pos')
-        ->get();
-});
-
-
-$jsonproducts = computed(function () {
-
-    return Product::select('id', 'name', 'price', 'descrip', 'detail', 'image', 'has_variants','product_category_id')
+    'products' => Product::select('id', 'name', 'price', 'descrip', 'detail', 'image', 'has_variants', 'product_category_id')
         ->with(['variants' => function($query) {
             $query->select('id', 'product_id', 'name', 'price');
         }])
         ->where('status', 1)
         ->orderBy('pos')
-        ->get();
-});
-
-$selectCategory = function ($categoryId) {
-    $this->selectedCategory = $categoryId;
-};
-
-$showProductDetails = function ($productId) {
-    $this->showProductModal = true;
-    $this->loadingProduct = true;
-    $this->selectedProduct = null;
-
-    // Simulamos un pequeño delay para mostrar el loading (opcional)
-    $this->dispatch('product-loading-started');
-
-    // Cargamos el producto
-    $this->selectedProduct = Product::with(['variants', 'category'])
-        ->find($productId);
-
-    $this->loadingProduct = false;
-};
-
-$closeProductModal = function () {
-    $this->showProductModal = false;
-    $this->selectedProduct = null;
-    $this->loadingProduct = false;
-};
-
-$backToCategories = function () {
-    $this->selectedCategory = null;
-};
-
-// Función helper para obtener el nombre de la categoría seleccionada
-$getSelectedCategoryName = function () {
-    if (!$this->selectedCategory) {
-        return 'Categoría';
-    }
-
-    $category = $this->categories->firstWhere('id', $this->selectedCategory);
-    return $category ? $category->name : 'Categoría';
-};
+        ->get()
+        ->map(function($product) {
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'price' => $product->price,
+                'descrip' => $product->descrip,
+                'detail' => $product->detail,
+                'image' => $product->image,
+                'has_variants' => $product->has_variants,
+                'product_category_id' => $product->product_category_id,
+                'variants' => $product->variants->toArray(),
+                'category_name' => $product->category->name ?? null
+            ];
+        })
+        ->toArray(),
+]);
 ?>
-<section class="w-full">
-    <div class="relative mb-6 w-full">
+
+<section class="w-full" x-data="productStore()">
+    <div class="relative w-full">
         <flux:heading size="xl" level="1" class="mb-6">Productos</flux:heading>
         <flux:separator variant="subtle" />
     </div>
     <div class="w-full py-8 min-h-screen">
         <div class="container mx-auto px-4">
-            @if(!$selectedCategory && 22==33)
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @forelse($this->categories as $category)
-                    <div
-                        class="border-2 rounded shadow-md cursor-pointer overflow-hidden border-neutral-200/70 dark:border-neutral-600 peer-checked:border-yellow-500 peer-checked:bg-yellow-700 dark:peer-checked:bg-neutral-800 dark:peer-checked:border-yellow-400"
-                        wire:click="selectCategory({{ $category->id }})"
-                    >
-                        @if($category->image)
-                            <div class="h-40 bg-gray-200 overflow-hidden">
-                                <img
-                                    src="{{ Storage::url($category->image) }}"
-                                    alt="{{ $category->name }}"
-                                    class="w-full h-full object-cover"
-                                >
-                            </div>
-                        @else
-                            <div class="h-40 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                                <span class="text-white text-4xl">🍕</span>
-                            </div>
-                        @endif
-                        <div class="p-4 text-center">
-                            <h3 class="text-lg font-semibold  mb-2">{{ $category->name }}</h3>
-                            <p class="text-sm ">
-                                {{ $category->products()->where('status', 1)->count() }} productos
-                            </p>
-                        </div>
-                    </div>
-                @empty
-                    <div class="col-span-full text-center py-12">
-                        <div class=" text-6xl mb-4">📦</div>
-                        <p class="text-lg">No hay categorías disponibles</p>
-                    </div>
-                @endforelse
-            </div>
-            @endif
 
-            <!-- Vista de Productos por Categoría -->
-            @if($selectedCategory && 22==33)
-            <div class="rounded-lg shadow-lg">
-                <!-- Header de categoría -->
-                <div class="bg-gradient-to-r from-blue-600 to-purple-700  p-6 rounded-t-lg">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <button
-                                wire:click="backToCategories"
-                                class="flex items-center space-x-2  hover:text-blue-200 transition-colors"
-                            >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                                </svg>
-                                <span>Volver a categorías</span>
-                            </button>
-                        </div>
-                        <h2 class="text-2xl font-bold">
-                            {{ $this->getSelectedCategoryName() }}
-                        </h2>
-                        <div class="text-sm">
-                            {{ $this->products->count() }} productos
-                        </div>
-                    </div>
+            <!-- Botón para ver pedido -->
+            <div class="mb-4 flex justify-end">
+                <flux:modal.trigger name="order-preview">
+                    <flux:button variant="primary">
+                        <flux:icon.shopping-cart class="mr-2" />
+                        Ver Pedido (<span x-text="orderItems.length"></span>)
+                    </flux:button>
+                </flux:modal.trigger>
+            </div>
+
+            <!-- Filtros -->
+            <div x-data="{ busqueda: '', categoriaSeleccionada: '' }">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <flux:select x-model="categoriaSeleccionada" placeholder="Todas las categorías">
+                        <flux:select.option value="">Todas las categorías</flux:select.option>
+                        @foreach($this->categories as $category)
+                            <flux:select.option value="{{ $category['id'] }}">
+                                {{ $category['name'] }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+
+                    <flux:input
+                        type="text"
+                        x-model="busqueda"
+                        placeholder="Buscar..."
+                    />
                 </div>
 
                 <!-- Lista de productos -->
-                <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @forelse($this->products as $product)
-                            <div
-                                class="border border-neutral-200/70 dark:border-neutral-600 bg-neutral-200 dark:bg-neutral-700  rounded-lg hover:shadow-md transition-shadow duration-300 cursor-pointer"
-                                wire:click="showProductDetails({{ $product->id }})"
-                            >
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @forelse($this->products as $product)
+                        <div x-show="('{{ strtolower($product['name']) }}'.includes(busqueda.toLowerCase()) || busqueda === '') &&
+                                (categoriaSeleccionada === '' || '{{ $product['product_category_id'] }}' === categoriaSeleccionada)"
+                            class="border border-neutral-200/70 dark:border-neutral-600 bg-neutral-200 dark:bg-neutral-700 rounded-lg hover:shadow-md transition-shadow duration-300 cursor-pointer"
+                            x-on:click="openProductModal({{ $product['id'] }})"
+                        >
+                            <div class="p-4">
+                                <h3 class="text-lg font-semibold mb-2">{{ $product['name'] }}</h3>
 
-                                <div class="p-4">
-                                    <h3 class="text-lg font-semibold mb-2">{{ $product->name }}</h3>
+                                @if($product['descrip'])
+                                    <p class="text-sm mb-3 line-clamp-2">{{ $product['descrip'] }}</p>
+                                @endif
 
-                                    @if($product->descrip)
-                                        <p class="text-sm  mb-3 line-clamp-2">{{ $product->descrip }}</p>
-                                    @endif
-
-                                    <div class="flex justify-between items-center">
-                                        <div class="text-lg">
-                                            @if($product->has_variants)
-                                                <span class="text-sm ">Desde</span>
-                                                ${{ number_format($product->variants->min('price') ?? $product->price, 2) }}
-                                            @else
-                                                ${{ number_format($product->price, 2) }}
-                                            @endif
-                                        </div>
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium  ">
-                                            Ver detalles
-                                        </span>
+                                <div class="flex justify-between items-center">
+                                    <div class="text-lg">
+                                        @if($product['has_variants'])
+                                            <span class="text-sm">Desde</span>
+                                            ${{ number_format(min(array_column($product['variants'], 'price') ?? [$product['price']]), 2) }}
+                                        @else
+                                            ${{ number_format($product['price'], 2) }}
+                                        @endif
                                     </div>
                                 </div>
                             </div>
-                        @empty
-                            <div class="col-span-full text-center py-12">
-                                <div class="text-gray-400 text-6xl mb-4">😔</div>
-                                <p class="text-gray-500 text-lg mb-2">No hay productos en esta categoría</p>
-                                <button
-                                    wire:click="backToCategories"
-                                    class="text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                    Volver a categorías
-                                </button>
-                            </div>
-                        @endforelse
-                    </div>
+                        </div>
+                    @empty
+                        <div class="col-span-full text-center py-12">
+                            <div class="text-gray-400 text-6xl mb-4">😔</div>
+                            <p class="text-gray-500 text-lg mb-2">No hay productos disponibles</p>
+                        </div>
+                    @endforelse
                 </div>
             </div>
-            @endif
 
-
-
-    <div x-data="{ busqueda: '', categoriaSeleccionada: '' }">
-        <!-- Flux Select de categorías -->
-    <div class="grid grid-cols-2 gap-4 mb-4">
-        <flux:select x-model="categoriaSeleccionada" placeholder="Todas las categorías">
-            <flux:select.option value="">Todas las categorías</flux:select.option>
-            @foreach($this->categories as $category)
-                <flux:select.option value="{{ $category['id'] }}">{{ $category['name'] }}</flux:select.option>
-            @endforeach
-        </flux:select>
-
-        <flux:input
-            type="text"
-            x-model="busqueda"
-            placeholder="Buscar..."
-        />
-    </div>
-
-        <!-- Lista de productos con doble filtro -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @forelse($this->jsonproducts as $product)
-                <div x-show="('{{ strtolower($product['name']) }}'.includes(busqueda.toLowerCase()) || busqueda === '') &&
-                        (categoriaSeleccionada === '' || '{{ $product['product_category_id'] }}' === categoriaSeleccionada)"
-                    class="border border-neutral-200/70 dark:border-neutral-600 bg-neutral-200 dark:bg-neutral-700  rounded-lg hover:shadow-md transition-shadow duration-300 cursor-pointer"
-                    wire:click="showProductDetails({{ $product->id }})"
-                >
-
-                    <div class="p-4">
-                        <h3 class="text-lg font-semibold mb-2">{{ $product->name }}</h3>
-
-                        @if($product->descrip)
-                            <p class="text-sm  mb-3 line-clamp-2">{{ $product->descrip }}</p>
-                        @endif
-
-                        <div class="flex justify-between items-center">
-                            <div class="text-lg">
-                                @if($product->has_variants)
-                                    <span class="text-sm ">Desde</span>
-                                    ${{ number_format($product->variants->min('price') ?? $product->price, 2) }}
-                                @else
-                                    ${{ number_format($product->price, 2) }}
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @empty
-                <div class="col-span-full text-center py-12">
-                    <div class="text-gray-400 text-6xl mb-4">😔</div>
-                    <p class="text-gray-500 text-lg mb-2">No hay productos en esta categoría</p>
-                    <button
-                        wire:click="backToCategories"
-                        class="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                        Volver a categorías
-                    </button>
-                </div>
-            @endforelse
-        </div>
-
-    </div>
-            <!-- Modal de Detalles del Producto usando Flux -->
-            @if($showProductModal)
-            <flux:modal name="product-details" class="max-w-2xl" wire:model="showProductModal">
-                <div class="space-y-6">
-                    @if($loadingProduct || !$selectedProduct)
-                        <!-- Estado de carga -->
-                        <div class="flex flex-col items-center justify-center py-12">
-                            <flux:icon.loading class="w-12 h-12 text-blue-600 mb-4" />
-                            <flux:heading size="md">Cargando producto...</flux:heading>
-                            <flux:text class="text-gray-500 mt-2">Por favor espere</flux:text>
-                        </div>
-                    @else
-                        <!-- Contenido del producto cuando ya cargó -->
-                        <!-- Encabezado -->
+            <!-- Modal de Detalles del Producto (controlado por Alpine) -->
+            <flux:modal name="product-details" class="max-w-2xl">
+                <div class="space-y-4" x-data="productModal()">
                         <div>
-                            <flux:heading size="lg">{{ $selectedProduct->name }}</flux:heading>
-
-                            @if($selectedProduct->category)
-                                <span class="inline-block bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm mt-2">
-                                    {{ $selectedProduct->category->name }}
-                                </span>
-                            @endif
-                        </div>
-
-                        <!-- Descripción -->
-                        @if($selectedProduct->descrip)
-                            <flux:text class="text-gray-600">{{ $selectedProduct->descrip }}</flux:text>
-                        @endif
-
-                        <!-- Detalles -->
-                        @if($selectedProduct->detail)
-                            <div class="prose prose-sm max-w-none text-gray-600">
-                                {!! nl2br(e($selectedProduct->detail)) !!}
+                            <!-- Encabezado -->
+                            <div>
+                                <flux:heading size="lg" x-text="productData?.name || 'name'"></flux:heading>
+                                <template x-if="productData?.category_name">
+                                    <flux:text variant="subtle" x-text="productData?.category_name || 'category_name'"></flux:text>
+                                </template>
                             </div>
-                        @endif
 
-                        <!-- Precios y Variantes -->
-                        <div class="border-t border-gray-200 pt-4">
-                            <flux:heading size="md">Precios</flux:heading>
+                            <!-- Descripción -->
+                            <template x-if="productData?.descrip">
+                                <flux:text class="text-gray-600" x-text="productData?.descrip || 'descrip'"></flux:text>
+                            </template>
 
-                            @if($selectedProduct->has_variants && $selectedProduct->variants->count() > 0)
-                                <div class="space-y-2 mt-3">
-                                    @foreach($selectedProduct->variants as $variant)
-                                        <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                                            <span class="text-gray-700">{{ $variant->name }}</span>
-                                            <span class="font-semibold text-blue-600">${{ number_format($variant->price, 2) }}</span>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @else
+                            <!-- Detalles -->
+                            <template x-if="productData?.detail">
+                                <div class="prose prose-sm max-w-none text-gray-600"
+                                     x-html="productData.detail.replace(/\n/g, '<br>')"></div>
+                            </template>
+
+                            <!-- Precios y Cantidad -->
+                            <div class="border-t border-gray-200 pt-4">
                                 <div class="flex justify-between items-center py-2 mt-3">
                                     <span class="text-gray-700">Precio unitario</span>
-                                    <span class="text-2xl font-bold text-blue-600">${{ number_format($selectedProduct->price, 2) }}</span>
+                                    <span class="text-2xl font-bold text-blue-600"
+                                          x-text="'$' + unitPrice.toFixed(2)"></span>
                                 </div>
-                            @endif
-                        </div>
 
-                        <!-- Botones de acción -->
-                        <div class="flex border-t border-gray-200 pt-4">
-                            <flux:spacer />
-                            <flux:button
-                                wire:click="closeProductModal"
-                                class="mr-2"
-                            >
-                                Cerrar
-                            </flux:button>
-                            <flux:button variant="primary">
-                                Agregar al pedido
-                            </flux:button>
+                                <flux:input.group class="my-4">
+                                    <flux:button
+                                        icon="minus"
+                                        x-on:click="if(quantity > 1) quantity--"
+                                        x-bind:disabled="quantity <= 1"
+                                    >
+                                        -
+                                    </flux:button>
+                                    <flux:input
+                                        placeholder="Cantidad"
+                                        readonly
+                                        x-model="quantity"
+                                        class="text-center"
+                                    />
+                                    <flux:button
+                                        icon="plus"
+                                        x-on:click="quantity++"
+                                    >
+                                        +
+                                    </flux:button>
+                                </flux:input.group>
+
+                                <!-- Total calculado -->
+                                <div class="flex justify-between items-center py-2 bg-blue-50 dark:bg-blue-900/20 px-4 rounded">
+                                    <span class="font-semibold">Total:</span>
+                                    <span class="text-2xl font-bold text-blue-600"
+                                          x-text="'$' + totalPrice.toFixed(2)"></span>
+                                </div>
+
+                                <!-- Instrucciones especiales -->
+                                <div class="mt-4">
+                                    <flux:label>Instrucciones especiales (opcional)</flux:label>
+                                    <flux:textarea
+                                        x-model="specialInstructions"
+                                        placeholder="Ej: Sin cebolla, extra queso, etc."
+                                        rows="3"
+                                    />
+                                </div>
+
+                                <!-- Botones de acción -->
+                                <div class="flex border-t border-gray-200 pt-4 mt-4">
+                                    <flux:spacer />
+                                    <flux:button
+                                        x-on:click="$flux.modal('product-details').close()"
+                                        class="mr-2"
+                                    >
+                                        Cerrar
+                                    </flux:button>
+                                    <flux:button
+                                        variant="primary"
+                                        x-on:click="addToOrder()"
+                                    >
+                                        <flux:icon.plus class="mr-2" />
+                                        Agregar al pedido
+                                    </flux:button>
+                                </div>
+                            </div>
                         </div>
-                    @endif
                 </div>
             </flux:modal>
-            @endif
+
+            <!-- Modal de Pedido Preseleccionado -->
+            <flux:modal name="order-preview" class="md:w-[600px]">
+                <div class="space-y-6">
+                    <div>
+                        <flux:heading size="lg">Productos Seleccionados</flux:heading>
+                        <flux:text variant="subtle">Revisa tu pedido antes de confirmar</flux:text>
+                    </div>
+
+                    <!-- Lista de productos en el pedido -->
+                    <div class="space-y-4 max-h-[400px] overflow-y-auto">
+                        <template x-if="orderItems.length === 0">
+                            <div class="text-center py-8">
+                                <flux:icon.shopping-cart class="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                                <flux:text variant="subtle">No hay productos en el pedido</flux:text>
+                            </div>
+                        </template>
+
+                        <template x-for="(item, index) in orderItems" :key="index">
+                            <div class="border border-neutral-200 dark:border-neutral-600 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800">
+                                <!-- Nombre del producto -->
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="flex-1">
+                                        <flux:heading size="sm" x-text="item.product_name"></flux:heading>
+                                        <flux:text variant="subtle" class="text-xs" x-text="'Precio unitario: $' + parseFloat(item.unit_price).toFixed(2)"></flux:text>
+                                    </div>
+                                    <flux:button
+                                        size="sm"
+                                        variant="ghost"
+                                        @click="removeItem(index)"
+                                        class="text-red-600 hover:text-red-800"
+                                    >
+                                        <flux:icon.trash class="w-4 h-4" />
+                                    </flux:button>
+                                </div>
+
+                                <!-- Cantidad y Total -->
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">Cantidad:</span>
+                                        <span class="font-semibold" x-text="item.quantity"></span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">Total: </span>
+                                        <span class="font-bold text-lg text-blue-600" x-text="'$' + parseFloat(item.total_price).toFixed(2)"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Instrucciones especiales -->
+                                <template x-if="item.special_instructions">
+                                    <div class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                                        <flux:text variant="subtle" class="text-xs" >
+                                            <strong>Nota:</strong> <span x-text="item.special_instructions"></span>
+                                        </flux:text>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Total del pedido -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <div class="flex justify-between items-center">
+                            <flux:heading size="md">Total del Pedido:</flux:heading>
+                            <flux:heading size="lg" class="text-blue-600" x-text="'$' + calculateTotal().toFixed(2)"></flux:heading>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="flex gap-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <flux:button @click="clearOrder()" variant="ghost">
+                            Limpiar todo
+                        </flux:button>
+                        <flux:spacer />
+                        <flux:button>
+                            Cerrar
+                        </flux:button>
+                        <flux:button variant="primary" x-show="orderItems.length > 0">
+                            Confirmar Pedido
+                        </flux:button>
+                    </div>
+                </div>
+            </flux:modal>
+
         </div>
     </div>
-
 </section>
+<!-- Solo cambios en el JavaScript -->
+<script>
+document.addEventListener('alpine:init', () => {
+    // Store para productos y pedido - AHORA TAMBIÉN PARA EL MODAL
+    Alpine.store('productStore', {
+        products: @json($this->products),
+        categories: @json($this->categories),
+        currentProduct: null, // <-- AÑADIDO
+
+        getProductById(id) {
+            return this.products.find(product => product.id == id);
+        },
+
+        filterByCategory(categoryId) {
+            if (!categoryId) return this.products;
+            return this.products.filter(product => product.product_category_id == categoryId);
+        },
+
+        searchByName(searchTerm) {
+            if (!searchTerm) return this.products;
+            return this.products.filter(product =>
+                product.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        },
+
+        // Método para abrir modal
+        openProductModal(productId) {
+            const productData = this.getProductById(productId);
+            if (productData) {
+                this.currentProduct = productData;
+                // Abrir modal usando el API de Flux
+                Flux.modal('product-details').show();
+            }
+        },
+
+        // Método para cerrar modal
+        closeProductModal() {
+            this.currentProduct = null;
+            Flux.modal('product-details').close();
+        }
+    });
+
+    // Store para el pedido (sin cambios)
+    Alpine.store('order', {
+        items: [],
+        init() {
+            const saved = localStorage.getItem('orderItems');
+            if (saved) {
+                this.items = JSON.parse(saved);
+            }
+        },
+        addToOrder(item) {
+            this.items.push(item);
+            this.saveToLocalStorage();
+            this.showNotification('Producto agregado al pedido');
+        },
+        removeItem(index) {
+            this.items.splice(index, 1);
+            this.saveToLocalStorage();
+            this.showNotification('Producto eliminado del pedido');
+        },
+        clearOrder() {
+            this.items = [];
+            this.saveToLocalStorage();
+            this.showNotification('Pedido limpiado');
+        },
+        calculateTotal() {
+            return this.items.reduce((total, item) => {
+                return total + parseFloat(item.total_price);
+            }, 0);
+        },
+        saveToLocalStorage() {
+            localStorage.setItem('orderItems', JSON.stringify(this.items));
+        },
+        showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        },
+        getItemCount() {
+            return this.items.length;
+        }
+    });
+});
+
+function productStore() {
+    return {
+        // Método simplificado para abrir el modal
+        openProductModal(productId) {
+            Alpine.store('productStore').openProductModal(productId);
+        },
+
+        // Getters para el pedido
+        get orderItems() {
+            return Alpine.store('order').items;
+        },
+
+        get orderCount() {
+            return Alpine.store('order').getItemCount();
+        },
+
+        removeItem(index) {
+            Alpine.store('order').removeItem(index);
+        },
+
+        clearOrder() {
+            Alpine.store('order').clearOrder();
+        },
+
+        calculateTotal() {
+            return Alpine.store('order').calculateTotal();
+        }
+    };
+}
+
+function productModal() {
+    return {
+        quantity: 1,
+        specialInstructions: '',
+
+        // Obtener datos del store directamente
+        get productData() {
+            return Alpine.store('productStore').currentProduct;
+        },
+
+        // Usar reactive getter para loading
+        get loading() {
+            return !this.productData;
+        },
+
+        init() {
+            console.log('productModal inicializado');
+
+            // Resetear cuando se cierra el modal
+            this.$watch('$flux.modal("product-details").open', (isOpen) => {
+                console.log('Modal open state:', isOpen);
+                if (!isOpen) {
+                    this.resetModal();
+                }
+            });
+        },
+
+        get unitPrice() {
+            return this.productData ? parseFloat(this.productData.price) : 0;
+        },
+
+        get totalPrice() {
+            return this.quantity * this.unitPrice;
+        },
+
+        addToOrder() {
+            if (!this.productData) return;
+
+            Alpine.store('order').addToOrder({
+                product_id: this.productData.id,
+                product_name: this.productData.name,
+                quantity: this.quantity,
+                unit_price: this.unitPrice,
+                total_price: this.totalPrice,
+                special_instructions: this.specialInstructions,
+                status: 'pending'
+            });
+
+            // Cerrar el modal usando el store
+            Alpine.store('productStore').closeProductModal();
+        },
+
+        resetModal() {
+            this.quantity = 1;
+            this.specialInstructions = '';
+        }
+    };
+}
+</script>

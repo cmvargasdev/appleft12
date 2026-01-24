@@ -31,9 +31,11 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->prefix('admin')->group(function () {
 
-    //Volt::mount(['admin' => resource_path('views/livewire/admin')]);
+    Volt::mount([
+        'admin' => base_path('resources/views/livewire/admin')
+    ]);
 
-    Route::view('dashboard', 'admin/dashboard')->name('admin.dashboard');
+    Route::view('dashboard', 'dashboard')->name('admin.dashboard');
     Route::redirect('/', 'admin/dashboard');
 
     Route::prefix('products')

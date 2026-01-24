@@ -13,10 +13,10 @@ class OrderItem extends Model
         'unit_price',
         'total_price',
         'special_instructions',
-        'selected_variants',
-        'selected_extras',
-        'selected_sides',
-        'status'
+        #'selected_variants',
+        #'selected_extras',
+        #'selected_sides',
+        'status' // pending, preparing, ready, served, cancelled
     ];
 
     // Relación con Order
