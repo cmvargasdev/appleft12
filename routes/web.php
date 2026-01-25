@@ -19,12 +19,14 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/dashboard', 'waiter/tables')->name('dashboard');
     #Volt::route('tables/{table}', 'tables.show')->name('tables.show');
     Volt::route('products', 'waiter/products')->name('products.list');
+    Volt::route('products/{order}/order', 'waiter/products')->name('products.order');
 
     #Volt::route('tables', 'tables.index')->name('tables.index');
 
 
 
     Volt::route('orders', 'waiter/orders')->name('orders.list');
+    Volt::route('orders/{order}/items', 'waiter/order-items')->name('orders.items');
     #Volt::route('orders/{order}', 'orders.show')->name('orders.show');
 
 });

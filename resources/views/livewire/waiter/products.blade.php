@@ -1,9 +1,15 @@
 <?php
-use function Livewire\Volt\{state};
+use function Livewire\Volt\{state, mount};
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\Order;
+use App\Models\OrderItem;
 
 state([
+    'order_id' => 0,
+    'order' => null,
+    'order_number' => '',
+
     'categories' => ProductCategory::select('id', 'name', 'image')
         ->whereHas('products', function ($query) {
             $query->where('status', 1);
@@ -34,6 +40,88 @@ state([
         })
         ->toArray(),
 ]);
+
+mount(function ($order = null) {
+    $this->order_id = $order ? (int) $order : 0;
+
+    if ($this->order_id > 0) {
+        $this->order = Order::find($this->order_id);
+        if ($this->order) {
+            $this->order_number = $this->order->order_number ?? '';
+        }
+    }
+
+    // Generar número de orden automático si no existe
+    if (empty($this->order_number)) {
+        $this->order_number = 'ORD-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+    }
+});
+
+$confirmOrder = function ($items) {
+    try {
+        // Validar que haya items
+        if (empty($items)) {
+            session()->flash('error', 'No hay productos en el pedido');
+            return;
+        }
+
+        // Calcular totales
+        $subtotal = collect($items)->sum('total_price');
+        $tax = $subtotal * 0.10; // 10% de impuesto, ajusta según necesites
+        $total = $subtotal + $tax;
+
+        // Crear o actualizar orden
+        if ($this->order_id > 0 && $this->order) {
+            // Actualizar orden existente
+            $this->order->update([
+                'order_number' => $this->order_number,
+                'subtotal' => $this->order->subtotal + $subtotal,
+                'tax' => $this->order->tax + $tax,
+                'total' => $this->order->total + $total,
+            ]);
+            $order = $this->order;
+        } else {
+            // Crear nueva orden
+            $order = Order::create([
+                'order_number' => $this->order_number,
+                'status' => 'pendiente',
+                'type' => 'dine_in', // Ajusta según necesites
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'total' => $total,
+                'customer_id' => null,
+                'table_id' => null,
+                'user_id' => auth()->id(),
+                'notes' => null,
+            ]);
+        }
+
+        // Agregar items a la orden
+        foreach ($items as $item) {
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'total_price' => $item['total_price'],
+                'special_instructions' => $item['special_instructions'] ?? null,
+                'status' => 'pending',
+            ]);
+        }
+
+        session()->flash('success', 'Pedido confirmado exitosamente');
+
+        // Dispatch evento para limpiar el storage en el frontend
+        $this->dispatch('order-confirmed', orderId: $order->id);
+
+        // Redirigir a la misma orden para seguir agregando productos
+        return redirect()->route('products.order', ['order' => $order->id]);
+
+    } catch (\Exception $e) {
+        session()->flash('error', 'Error al confirmar el pedido: ' . $e->getMessage());
+    }
+};
+
 ?>
 
 <section class="w-full" x-data="productStore()">
@@ -41,6 +129,20 @@ state([
         <flux:heading size="xl" level="1" class="mb-6">Productos</flux:heading>
         <flux:separator variant="subtle" />
     </div>
+
+    <!-- Mensajes flash -->
+    @if (session()->has('success'))
+        <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if (session()->has('error'))
+        <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="w-full py-8 min-h-screen">
         <div class="container mx-auto px-4">
 
@@ -109,7 +211,7 @@ state([
                 </div>
             </div>
 
-            <!-- Modal de Detalles del Producto (controlado por Alpine) -->
+            <!-- Modal de Detalles del Producto -->
             <flux:modal name="product-details" class="max-w-2xl">
                 <div class="space-y-4" x-data="productModal()">
                         <div>
@@ -145,9 +247,7 @@ state([
                                         icon="minus"
                                         x-on:click="if(quantity > 1) quantity--"
                                         x-bind:disabled="quantity <= 1"
-                                    >
-                                        -
-                                    </flux:button>
+                                    />
                                     <flux:input
                                         placeholder="Cantidad"
                                         readonly
@@ -157,9 +257,7 @@ state([
                                     <flux:button
                                         icon="plus"
                                         x-on:click="quantity++"
-                                    >
-                                        +
-                                    </flux:button>
+                                    />
                                 </flux:input.group>
 
                                 <!-- Total calculado -->
@@ -203,98 +301,122 @@ state([
 
             <!-- Modal de Pedido Preseleccionado -->
             <flux:modal name="order-preview" class="md:w-[600px]">
-                <div class="space-y-6">
-                    <div>
-                        <flux:heading size="lg">Productos Seleccionados</flux:heading>
-                        <flux:text variant="subtle">Revisa tu pedido antes de confirmar</flux:text>
-                    </div>
+                <form wire:submit="confirmOrder(JSON.parse($refs.itemsData.value))" x-data="orderPreview()">
+                    <div class="space-y-6">
+                        <div>
+                            <flux:heading size="lg">Productos Seleccionados</flux:heading>
+                            <flux:text variant="subtle">Revisa tu pedido antes de confirmar</flux:text>
+                        </div>
 
-                    <!-- Lista de productos en el pedido -->
-                    <div class="space-y-4 max-h-[400px] overflow-y-auto">
-                        <template x-if="orderItems.length === 0">
-                            <div class="text-center py-8">
-                                <flux:icon.shopping-cart class="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                                <flux:text variant="subtle">No hay productos en el pedido</flux:text>
-                            </div>
-                        </template>
+                        <!-- Campo para número de orden -->
+                        <div>
+                            <flux:label>Número de Orden</flux:label>
+                            <flux:input
+                                wire:model="order_number"
+                                type="text"
+                                placeholder="Ej: ORD-20250125-0001"
+                                required
+                            />
+                            <flux:text variant="subtle" class="text-xs mt-1">
+                                @if($this->order_id > 0)
+                                    Editando orden existente #{{ $this->order_id }}
+                                @else
+                                    Se creará una nueva orden
+                                @endif
+                            </flux:text>
+                        </div>
 
-                        <template x-for="(item, index) in orderItems" :key="index">
-                            <div class="border border-neutral-200 dark:border-neutral-600 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800">
-                                <!-- Nombre del producto -->
-                                <div class="flex justify-between items-start mb-2">
-                                    <div class="flex-1">
-                                        <flux:heading size="sm" x-text="item.product_name"></flux:heading>
-                                        <flux:text variant="subtle" class="text-xs" x-text="'Precio unitario: $' + parseFloat(item.unit_price).toFixed(2)"></flux:text>
-                                    </div>
-                                    <flux:button
-                                        size="sm"
-                                        variant="ghost"
-                                        @click="removeItem(index)"
-                                        class="text-red-600 hover:text-red-800"
-                                    >
-                                        <flux:icon.trash class="w-4 h-4" />
-                                    </flux:button>
+                        <!-- Lista de productos en el pedido -->
+                        <div class="space-y-4 max-h-[400px] overflow-y-auto">
+                            <template x-if="orderItems.length === 0">
+                                <div class="text-center py-8">
+                                    <flux:icon.shopping-cart class="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                                    <flux:text variant="subtle">No hay productos en el pedido</flux:text>
                                 </div>
+                            </template>
 
-                                <!-- Cantidad y Total -->
-                                <div class="flex justify-between items-center mb-2">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400">Cantidad:</span>
-                                        <span class="font-semibold" x-text="item.quantity"></span>
+                            <template x-for="(item, index) in orderItems" :key="index">
+                                <div class="border border-neutral-200 dark:border-neutral-600 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800">
+                                    <!-- Nombre del producto -->
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex-1">
+                                            <flux:heading size="sm" x-text="item.product_name"></flux:heading>
+                                            <flux:text variant="subtle" class="text-xs" x-text="'Precio unitario: $' + parseFloat(item.unit_price).toFixed(2)"></flux:text>
+                                        </div>
+                                        <flux:button
+                                            size="sm"
+                                            variant="ghost"
+                                            type="button"
+                                            @click="removeItem(index)"
+                                            class="text-red-600 hover:text-red-800"
+                                        >
+                                            <flux:icon.trash class="w-4 h-4" />
+                                        </flux:button>
                                     </div>
-                                    <div class="text-right">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400">Total: </span>
-                                        <span class="font-bold text-lg text-blue-600" x-text="'$' + parseFloat(item.total_price).toFixed(2)"></span>
+
+                                    <!-- Cantidad y Total -->
+                                    <div class="flex justify-between items-center mb-2">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-sm text-gray-600 dark:text-gray-400">Cantidad:</span>
+                                            <span class="font-semibold" x-text="item.quantity"></span>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-sm text-gray-600 dark:text-gray-400">Total: </span>
+                                            <span class="font-bold text-lg text-blue-600" x-text="'$' + parseFloat(item.total_price).toFixed(2)"></span>
+                                        </div>
                                     </div>
+
+                                    <!-- Instrucciones especiales -->
+                                    <template x-if="item.special_instructions">
+                                        <div class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                                            <flux:text variant="subtle" class="text-xs" >
+                                                <strong>Nota:</strong> <span x-text="item.special_instructions"></span>
+                                            </flux:text>
+                                        </div>
+                                    </template>
                                 </div>
+                            </template>
+                        </div>
 
-                                <!-- Instrucciones especiales -->
-                                <template x-if="item.special_instructions">
-                                    <div class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-                                        <flux:text variant="subtle" class="text-xs" >
-                                            <strong>Nota:</strong> <span x-text="item.special_instructions"></span>
-                                        </flux:text>
-                                    </div>
-                                </template>
+                        <!-- Total del pedido -->
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <div class="flex justify-between items-center">
+                                <flux:heading size="md">Total del Pedido:</flux:heading>
+                                <flux:heading size="lg" class="text-blue-600" x-text="'$' + calculateTotal().toFixed(2)"></flux:heading>
                             </div>
-                        </template>
-                    </div>
+                        </div>
 
-                    <!-- Total del pedido -->
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <div class="flex justify-between items-center">
-                            <flux:heading size="md">Total del Pedido:</flux:heading>
-                            <flux:heading size="lg" class="text-blue-600" x-text="'$' + calculateTotal().toFixed(2)"></flux:heading>
+                        <!-- Input hidden para pasar los items al backend -->
+                        <input type="hidden" x-ref="itemsData" :value="JSON.stringify(orderItems)">
+
+                        <!-- Botones de acción -->
+                        <div class="flex gap-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <flux:button type="button" @click="clearOrder()" variant="ghost">
+                                Limpiar todo
+                            </flux:button>
+                            <flux:spacer />
+                            <flux:button type="button">
+                                Cerrar
+                            </flux:button>
+                            <flux:button type="submit" variant="primary" x-show="orderItems.length > 0">
+                                Confirmar Pedido
+                            </flux:button>
                         </div>
                     </div>
-
-                    <!-- Botones de acción -->
-                    <div class="flex gap-2 border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <flux:button @click="clearOrder()" variant="ghost">
-                            Limpiar todo
-                        </flux:button>
-                        <flux:spacer />
-                        <flux:button>
-                            Cerrar
-                        </flux:button>
-                        <flux:button variant="primary" x-show="orderItems.length > 0">
-                            Confirmar Pedido
-                        </flux:button>
-                    </div>
-                </div>
+                </form>
             </flux:modal>
 
         </div>
     </div>
 </section>
-<!-- Solo cambios en el JavaScript -->
+
 <script>
 document.addEventListener('alpine:init', () => {
-    // Store para productos y pedido - AHORA TAMBIÉN PARA EL MODAL
+    // Store para productos y pedido
     Alpine.store('productStore', {
         products: @json($this->products),
         categories: @json($this->categories),
-        currentProduct: null, // <-- AÑADIDO
+        currentProduct: null,
 
         getProductById(id) {
             return this.products.find(product => product.id == id);
@@ -312,55 +434,45 @@ document.addEventListener('alpine:init', () => {
             );
         },
 
-        // Método para abrir modal
         openProductModal(productId) {
             const productData = this.getProductById(productId);
             if (productData) {
                 this.currentProduct = productData;
-                // Abrir modal usando el API de Flux
                 Flux.modal('product-details').show();
             }
         },
 
-        // Método para cerrar modal
         closeProductModal() {
             this.currentProduct = null;
             Flux.modal('product-details').close();
         }
     });
 
-    // Store para el pedido (sin cambios)
+    // Store para el pedido (actualizado - sin localStorage)
     Alpine.store('order', {
         items: [],
-        init() {
-            const saved = localStorage.getItem('orderItems');
-            if (saved) {
-                this.items = JSON.parse(saved);
-            }
-        },
+
         addToOrder(item) {
             this.items.push(item);
-            this.saveToLocalStorage();
             this.showNotification('Producto agregado al pedido');
         },
+
         removeItem(index) {
             this.items.splice(index, 1);
-            this.saveToLocalStorage();
             this.showNotification('Producto eliminado del pedido');
         },
+
         clearOrder() {
             this.items = [];
-            this.saveToLocalStorage();
             this.showNotification('Pedido limpiado');
         },
+
         calculateTotal() {
             return this.items.reduce((total, item) => {
                 return total + parseFloat(item.total_price);
             }, 0);
         },
-        saveToLocalStorage() {
-            localStorage.setItem('orderItems', JSON.stringify(this.items));
-        },
+
         showNotification(message) {
             const notification = document.createElement('div');
             notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
@@ -368,9 +480,15 @@ document.addEventListener('alpine:init', () => {
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
         },
+
         getItemCount() {
             return this.items.length;
         }
+    });
+
+    // Escuchar evento de orden confirmada para limpiar items
+    window.addEventListener('order-confirmed', () => {
+        Alpine.store('order').clearOrder();
     });
 });
 
@@ -380,7 +498,6 @@ function productStore() {
             Alpine.store('productStore').openProductModal(productId);
         },
 
-        // Getters seguros para el pedido
         get orderItems() {
             const orderStore = Alpine.store('order');
             return orderStore ? orderStore.items : [];
@@ -413,18 +530,15 @@ function productModal() {
         quantity: 1,
         specialInstructions: '',
 
-        // Obtener datos del store directamente
         get productData() {
             return Alpine.store('productStore').currentProduct;
         },
 
-        // Usar reactive getter para loading
         get loading() {
             return !this.productData;
         },
 
         init() {
-            // Resetear cuando se cierra el modal
             this.$watch('$flux.modal("product-details").open', (isOpen) => {
                 if (!isOpen) {
                     this.resetModal();
@@ -453,13 +567,36 @@ function productModal() {
                 status: 'pending'
             });
 
-            // Cerrar el modal usando el store
             Alpine.store('productStore').closeProductModal();
         },
 
         resetModal() {
             this.quantity = 1;
             this.specialInstructions = '';
+        }
+    };
+}
+
+function orderPreview() {
+    return {
+        get orderItems() {
+            const orderStore = Alpine.store('order');
+            return orderStore ? orderStore.items : [];
+        },
+
+        removeItem(index) {
+            const orderStore = Alpine.store('order');
+            if (orderStore) orderStore.removeItem(index);
+        },
+
+        clearOrder() {
+            const orderStore = Alpine.store('order');
+            if (orderStore) orderStore.clearOrder();
+        },
+
+        calculateTotal() {
+            const orderStore = Alpine.store('order');
+            return orderStore ? orderStore.calculateTotal() : 0;
         }
     };
 }
