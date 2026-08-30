@@ -242,6 +242,6 @@ $updated = function ($property) {
         <div class="mb-4">
             {{ $products->links() }}
         </div>
-            <livewire:products.form-modal />
+            <livewire:admin.products.form-modal />
     </x-products.layout>
 </section>
